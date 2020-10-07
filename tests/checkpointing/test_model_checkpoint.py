@@ -510,8 +510,7 @@ def test_checkpointing_with_nan_as_first(tmpdir, mode):
 from pathlib import Path
 
 
-def _run_trainer():
-    Path('sam').mkdir(exist_ok=True) # it cant be a local sadly
+def _run_trainer(tmpdir):
     os.environ['PL_DEV_DEBUG'] = '1'
     monitor = [float('nan')]
     monitor += [5, 7, 8]
@@ -525,7 +524,7 @@ def _run_trainer():
 
     trainer = Trainer(
         checkpoint_callback=ModelCheckpoint(monitor='abc', mode='max', save_top_k=1, filepath=tmpdir),
-        default_root_dir='sam',
+        default_root_dir=tmpdir,
         val_check_interval=1.0,
         max_epochs=len(monitor),
     )
@@ -536,9 +535,9 @@ def _run_trainer():
     trainer.test()
 
 
-@pytest.mark.skipif(torch.cuda.device_count() < 2)
+@pytest.mark.skipif(torch.cuda.device_count() < 2, 'du')
 def test_ddp_checkpointing(tmpdir):
 
-    torch.multiprocessing.spawn(_run_trainer, args=(2,), nprocs=2)
+    torch.multiprocessing.spawn(_run_trainer, args=(tmpdir,), nprocs=2)
     contents = list(Path(tmpdir).iterdir())
     import ipdb; ipdb.set_trace()
