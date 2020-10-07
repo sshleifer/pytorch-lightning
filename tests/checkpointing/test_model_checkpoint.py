@@ -508,30 +508,36 @@ def test_checkpointing_with_nan_as_first(tmpdir, mode):
     assert trainer.dev_debugger.checkpoint_callback_history[-1]['epoch'] == len(monitor) - 1
 
 from pathlib import Path
+
+
+def _run_trainer():
+    Path('sam').mkdir(exist_ok=True) # it cant be a local sadly
+    os.environ['PL_DEV_DEBUG'] = '1'
+    monitor = [float('nan')]
+    monitor += [5, 7, 8]
+
+    class CurrentModel(BoringModel):
+        def validation_epoch_end(self, outputs):
+            val_loss = monitor[self.current_epoch]
+            self.log('abc', val_loss)
+
+    model = CurrentModel()
+
+    trainer = Trainer(
+        checkpoint_callback=ModelCheckpoint(monitor='abc', mode='max', save_top_k=1, filepath=tmpdir),
+        default_root_dir='sam',
+        val_check_interval=1.0,
+        max_epochs=len(monitor),
+    )
+    trainer.fit(model)
+
+    # check that last one is also the best one
+    assert trainer.dev_debugger.checkpoint_callback_history[-1]['epoch'] == len(monitor) - 1
+    trainer.test()
+
+
+@pytest.mark.skipif(torch.cuda.device_count() < 2)
 def test_ddp_checkpointing(tmpdir):
-    def _run_trainer():
-        os.environ['PL_DEV_DEBUG'] = '1'
-        monitor = [float('nan')]
-        monitor += [5, 7, 8]
-
-        class CurrentModel(BoringModel):
-            def validation_epoch_end(self, outputs):
-                val_loss = monitor[self.current_epoch]
-                self.log('abc', val_loss)
-
-        model = CurrentModel()
-
-        trainer = Trainer(
-            checkpoint_callback=ModelCheckpoint(monitor='abc', mode='max', save_top_k=1, filepath=tmpdir),
-            default_root_dir=tmpdir,
-            val_check_interval=1.0,
-            max_epochs=len(monitor),
-        )
-        trainer.fit(model)
-
-        # check that last one is also the best one
-        assert trainer.dev_debugger.checkpoint_callback_history[-1]['epoch'] == len(monitor) - 1
-        trainer.test()
 
     torch.multiprocessing.spawn(_run_trainer, args=(2,), nprocs=2)
     contents = list(Path(tmpdir).iterdir())
