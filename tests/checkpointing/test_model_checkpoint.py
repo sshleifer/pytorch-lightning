@@ -535,7 +535,7 @@ def _run_trainer(tmpdir):
     trainer.test()
 
 
-@pytest.mark.skipif(torch.cuda.device_count() < 2, 'du')
+@pytest.mark.skipif(torch.cuda.device_count() < 2, reason='du')
 def test_ddp_checkpointing(tmpdir):
 
     torch.multiprocessing.spawn(_run_trainer, args=(tmpdir,), nprocs=2)
